@@ -1,0 +1,21 @@
+{
+    "name": "vilshub/router",
+    "type": "library http routing",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Starlyvil",
+            "email": "stalyvil@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+      "php":">=5.3.0",
+      "vilshub/helpers": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "vilshub\\router\\" : "src"
+        }
+    }
+}
