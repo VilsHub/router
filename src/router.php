@@ -28,11 +28,9 @@ use vilshub\validator\validator;
     private $strictDisplay      = false;
     private $directories        = false;
     private $maskURL            = "";
-    private $errorMode          = false;
     private $maintenanceURL     = null;
     private $maintenanceMode    = false;
     private $host               = null;
-
 
     private function setFile($file){
       //Set target file
