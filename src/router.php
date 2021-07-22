@@ -9,11 +9,8 @@ use vilshub\validator\Validator;
 use \Route;
 
 /**
- *
+ * 
  */
-  /**
-  *
-  */
   class Router
   {
     private $displayBase        = null;
@@ -24,7 +21,7 @@ use \Route;
     private $defaultRouteMapDir = "/root";
     private $params             = [];
     private $routes             = null;
-    private $dynamicRoute    = false;
+    private $dynamicRoute       = false;
     private $strictDisplay      = false;
     private $directories        = false;
     private $maintenanceURL     = null;
@@ -34,6 +31,7 @@ use \Route;
     private $apiID              = "api";
     private $url;
     private $config;
+    private $maskExtension      = ".php";
 
     function __construct(){
       $this->url = $_SERVER["REQUEST_URI"];
@@ -63,6 +61,9 @@ use \Route;
         return false;
       }
     }
+    private function unmaskExtenstion($fileName){
+      return str_replace($this->maskExtension, "", $fileName);
+    }
     private function setData($data){
       $total = count($data);
       $this->data = $data;
@@ -75,6 +76,9 @@ use \Route;
     }
     private function checkTargetFile($fileName=null, $id=[], $displayBase, $useDefaultRouteMapDir=false){
       $defaultRouteMapDir = $useDefaultRouteMapDir?dirname($displayBase)."/".trim($this->defaultRouteMapDir, "/\\")."/":"";
+
+      //unmask extension
+      $fileName           = $this->unmaskExtenstion($fileName);
       $filePath           = $displayBase."/".$fileName.".php";
 
       if($fileName != null){//has file to check
@@ -176,6 +180,11 @@ use \Route;
           Validator::validateObject($value, Message::write("error", $msg));
           $this->config = $value;
           break;
+        case 'maskExtension':
+          $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a string";
+          Validator::validateString($value, Message::write("error", $msg));
+          $this->maskExtension = $value;
+          break;
         default:
           trigger_error(Message::write("error", " unknown property ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "red")), E_USER_NOTICE) ;
           break;
@@ -205,7 +214,11 @@ use \Route;
 
     public function listen($block, $displayBase, $strict=false){
         $url = $_SERVER["REQUEST_URI"];
-        if ($this->maintenanceMode) $this->redirect($this->maintenanceURL);
+        if ($this->maintenanceMode) {
+          if($url != $this->maintenanceURL){
+            $this->redirect($this->maintenanceURL);
+          }
+        };
         ob_start();
         $this->strictDisplay = $strict;
         
@@ -274,7 +287,7 @@ use \Route;
             }
           }
         }
-        
+
         if($this->displayFile != null){
            //insert block
            extract(["router" => &$this]);
@@ -299,7 +312,7 @@ use \Route;
     public function plugToSocket($name){
       function fragmentCheck($trimUrl,$key){
         $keysSegments = explode("|",$key);
-        $status = null;
+        $status       = null;
         $totalKeysSegments = count($keysSegments);
         $indexes = [];
         if($totalKeysSegments == 2){
@@ -330,10 +343,16 @@ use \Route;
         }
       }
       
-      $url = $_SERVER["REQUEST_URI"];
+      $url      = $_SERVER["REQUEST_URI"];
       $trimUrl  = explode("/", trim($url, "/"));
+      $total    = count($trimUrl);
+      
+      //unmask last url segment
+      $lastUrlSegment = $this->unmaskExtenstion($trimUrl[$total-1]);
+      $trimUrl[$total-1] = $lastUrlSegment;
+      
       foreach ($this->socketFiles[$name] as $key => $value) {
-        if($url == "/" && $key == "/"){
+        if(($url == "/" && $key == "/") || ($url == "/index".$this->maskExtension && ($key == "/index".$this->maskExtension || $key == "/"))){
           if(includeFile($value, $this)) break;
         }else{
           if(fragmentCheck($trimUrl, $key)){
