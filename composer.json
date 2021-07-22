@@ -1,6 +1,7 @@
 {
     "name": "vilshub/router",
-    "type": "library http routing",
+    "type": "library",
+    "description":"router is the routing system for zion light framework",
     "license": "MIT",
     "authors": [
         {
