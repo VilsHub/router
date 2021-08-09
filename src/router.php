@@ -111,13 +111,11 @@ use \Route;
           $routeType = Route::type($key);
           if($routeType == "static") continue;
           $dynamicSegment = Route::dynamicInfo($key, $this->url);
-          if($dynamicSegment["status"] === TRUE){
-            if($dynamicSegment["matched"] === TRUE){
-              //include the 1st route segment as file, and pass data
-              $rootBase = $displayBase.$this->routes[$key];
-              $this->checkAndDisplay($dynamicSegment["urlSegments"][0], $dynamicSegment["data"], $rootBase, false, false);
-              break;
-            }
+          if($dynamicSegment["matched"] === TRUE){         
+            //include the 1st route segment as file, and pass data
+            $rootBase = $displayBase.$this->routes[$key];
+            $this->checkAndDisplay($dynamicSegment["urlSegments"][0], $dynamicSegment["data"], $rootBase, false, false);
+            break;
           }else{
             continue;
           }
