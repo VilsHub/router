@@ -233,29 +233,32 @@ use \Route;
       }
     }
 
-    public function listen($block, $displayBase, $strict=false){
+    public function listen($block, $displayBase, $routes=null, $strict=false){
         $url = $_SERVER["REQUEST_URI"];
         if ($this->maintenanceMode) {
           if($url != $this->maintenanceURL){
             $this->redirect($this->maintenanceURL);
           }
         };
-
+        $this->routes = $routes == null ? $this->routes:$routes;
         ob_start();
         $this->strictDisplay = $strict;
         
         //validate argument
         $msg =  "Invalid argument type, ".Style::color(__CLASS__."->", "black").Style::color("display()", "black")." method argument must be a string";
         Validator::validateString($displayBase, Message::write("error", $msg));
-        if(!isset($this->routes["/"])){
-          trigger_error(Message::write("error", "At least, a root '/' route must be defined, define using the ".Style::color(__CLASS__."->", "black").Style::color("routesMapDir", "black") . " propety. Example ".Style::color("routerObj->routesMapDir = ['/' => '/root']", "blue") ));
-        }else{
-          //check if directory exist
-          if(!$this->checkDir($displayBase.$this->routes["/"], Message::write("error", "The root '/' route display base ".Style::color("'".$this->routes["/"]."'", "black")." specified, does not exist relative to the block display base ".Style::color($displayBase."/", "black"))));
-          if(!file_exists($block)){
-            trigger_error(Message::write("error", "The specified block file ".Style::color("'".$block."'", "black").", does not exist relative to the block directory ".Style::color($this->config->blocksDir, "black")));
+        if(!file_exists($block)){
+          trigger_error(Message::write("error", "The specified block file ".Style::color("'".$block."'", "black").", does not exist relative to the block directory ".Style::color($this->config->blocksDir, "black")));
+        }
+        if($routes == null){
+          if(!isset($this->routes["/"])){
+            trigger_error(Message::write("error", "At least, a root '/' route must be defined, define using the ".Style::color(__CLASS__."->", "black").Style::color("routesMapDir", "black") . " propety. Example ".Style::color("routerObj->routesMapDir = ['/' => '/root']", "blue") ));
+          }else{
+            //check if directory exist
+            if(!$this->checkDir($displayBase.$this->routes["/"], Message::write("error", "The root '/' route display base ".Style::color("'".$this->routes["/"]."'", "black")." specified, does not exist relative to the block display base ".Style::color($displayBase."/", "black"))));
           }
         }
+       
         
         if($url == "/"){//root        
           //check for default base file
@@ -277,10 +280,12 @@ use \Route;
               $this->checkTargetFile($trimUrl, [], $routeBase, false);
             }else{
               //check if display file exist for it
-              $rootBase = $displayBase.$this->routes["/"];
-              if(!$this->checkTargetFile($urlFragments[0], [], $rootBase)){
-                //file not exist, check for dynamic segment
-                $this->checkForDynamicRoute($displayBase);
+              if($routes == null){
+                $rootBase = $displayBase.$this->routes["/"];
+                if(!$this->checkTargetFile($urlFragments[0], [], $rootBase)){
+                  //file not exist, check for dynamic segment
+                  $this->checkForDynamicRoute($displayBase);
+                }
               }
             }
           }else if($urlTotalSegments == 2){
@@ -328,8 +333,8 @@ use \Route;
 
         if($this->displayFile != null){
            //insert block
-           global $app;
-           extract(["app" => $app]);
+           global $app, $application;
+           extract(["app" => $app, "application" => json_decode(json_encode($application))]);
            require($block);
         }
         ob_flush();
@@ -385,41 +390,50 @@ use \Route;
     private function includeFile($file, $obj){
       if(file_exists($file)){
         global $app;
-        extract(["app" => $app]);
+        extract(["app" => $app, "application" => $obj]);
         include($file); 
         return true;
       }else{
         trigger_error(Message::write("error", " The target file ".Style::color($file, "black")." not found for auto inclusion "));
       }
     }
-    public function plugToSocket($name){      
+    public function plugToSocket($name, $application=null){      
       $trimUrl  = Route::segments($this->url);
       $total    = count($trimUrl);
       
       //unmask last url segment
-      $lastUrlSegment = $this->unmaskExtenstion($trimUrl[$total-1]);
-      $trimUrl[$total-1] = $lastUrlSegment;
+      $lastUrlSegment     = $this->unmaskExtenstion($trimUrl[$total-1]);
+      $trimUrl[$total-1]  = $lastUrlSegment;
+
+      //Set socket file for either system route or application route
+
+      if($application != null){ //application socket files given
+        //Validate $appSocketFiles argument
+
+        $inUse      = $application->configInUse;
+        $appSocketFiles = require_once($application->config->{$inUse}->socket);
+        $msg =  "Application {$inUse} socket files, passed into ".Style::color(__CLASS__."->", "black").Style::color("plugToSocket(.x)", "black")." method as argument 2 must be null or an array of socket files";
+        Validator::validateArray($appSocketFiles, Message::write("error", $msg));
+        
+        $this->socketFiles = $appSocketFiles;
+      }
       
       //Check for global file and plug
       if(isset($this->socketFiles[$name]["*"])){
-        $this->includeFile($this->socketFiles[$name]["*"], $this);
+        $this->includeFile($this->socketFiles[$name]["*"], $application);
       } 
 
       //Check and plug other file
       foreach ($this->socketFiles[$name] as $key => $value) {
         if(($this->url == "/" && $key == "/") || ($this->url == "/index".$this->maskExtension && ($key == "/index".$this->maskExtension || $key == "/"))){
-          if($this->includeFile($value, $this)) break;
+          if($this->includeFile($value, $application)) break;
         }else{
           if($this->fragmentCheck($trimUrl, $key)){
-            if($this->includeFile($value, $this)) break;
+            if($this->includeFile($value, $application)) break;
           }
         }
       } 
       
-    }
-
-    public function route($type){
-      return Route::for($type, $this->config->apiId);      
     }
 
     public function validateURLSegments($maxSegment){//if url segment is more than the specified max
