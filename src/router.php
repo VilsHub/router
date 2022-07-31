@@ -1,10 +1,9 @@
 <?php
 namespace vilshub\router;
-use vilshub\helpers\Message;
-use \Exception;
+
+use Error;
 use vilshub\helpers\Get;
 use vilshub\helpers\Style;
-use vilshub\helpers\textProcessor;
 use vilshub\validator\Validator;
 use \Route;
 
@@ -27,12 +26,12 @@ use \Route;
     private $directories        = false;
     private $maintenanceURL     = null;
     private $maintenanceMode    = false;
-    private $host               = null;
     private $socketFiles        = [];
-    private $apiID              = "api";
     private $url;
     private $config;
     private $maskExtension      = ".php";
+    private $wordSeperator      = "-";
+    private $useWordSeperator   = false;
 
     function __construct($routes, $socketFiles, $config){
       $this->url          = $_SERVER["REQUEST_URI"];
@@ -66,6 +65,9 @@ use \Route;
       }
     }
     private function unmaskExtenstion($fileName){
+      if ($this->useWordSeperator){
+        $fileName = str_replace($this->wordSeperator, "", $fileName);
+      }
       return str_replace($this->maskExtension, "", $fileName);
     }
     private function setData($data){
@@ -80,11 +82,10 @@ use \Route;
     }
     private function checkTargetFile($fileName=null, $id=[], $displayBase, $useDefaultRouteMapDir=false){
       $defaultRouteMapDir = $useDefaultRouteMapDir ? dirname($displayBase)."/".trim($this->defaultRouteMapDir, "/\\")."/":$displayBase;
-      
       //unmask extension
       $fileName           = $this->unmaskExtenstion($fileName);
       $filePath           = $displayBase."/".$fileName.".php";
-     
+    
       if($fileName != null){//has file to check
         if(file_exists($filePath)){//file exist
           $this->setFile($filePath);
@@ -169,45 +170,55 @@ use \Route;
       switch ($propertyName) {
         case 'error404File':
           $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a string of URL e.g. ".Style::color("'/error/e404'", "blue");
-          Validator::validateString($value, Message::write("error", $msg));
+          Validator::validateString($value,  $msg);
           $this->error404File = $value;
           break;
         case 'error404URL':
           $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a string of URL e.g. ".Style::color("'/error/e404'", "blue");
-          Validator::validateString($value, Message::write("error", $msg));
+          Validator::validateString($value,  $msg);
           $this->error404URL = $value;
           break;
         case 'maintenanceURL':
           $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a string of URL e.g. ".Style::color("'/maintenance'", "blue");
-          Validator::validateString($value, Message::write("error", $msg));
+          Validator::validateString($value,  $msg);
           $this->maintenanceURL = $value;
           break;
         case 'defaultBaseFile':
           $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a string of file name e.g ".Style::color("index.php", "blue");
-          Validator::validateString($value, Message::write("error", $msg));
+          Validator::validateString($value,  $msg);
           $this->defaultBaseFile = rtrim($value, ".php");
           break;
         case 'defaultRouteMapDir':
           $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a string";
-          Validator::validateString($value, Message::write("error", $msg));
+          Validator::validateString($value,  $msg);
           $this->defaultRouteMapDir = $value;
           break;
         case 'dynamicRoute':
           $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a boolean";
-          Validator::validateBoolean($value, Message::write("error", $msg));
+          Validator::validateBoolean($value,  $msg);
           $this->dynamicRoute = $value;
           break;
         case 'maintenanceMode':
           $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a boolean";
-          Validator::validateBoolean($value, Message::write("error", $msg));
+          Validator::validateBoolean($value,  $msg);
           $this->maintenanceMode = $value;
           break;
         case 'maskExtension':
           $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a string";
-          Validator::validateString($value, Message::write("error", $msg));
+          Validator::validateString($value,  $msg);
           $this->maskExtension = $value;
           break;
-
+        case 'wordSeperator':
+          $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must";
+          Validator::validateString($value,  $msg." be a string");
+          if (strlen($value) > 1) trigger_error($msg." not be more than a character");
+          $this->wordSeperator = $value;
+          break;
+        case 'useWordSeperator':
+          $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a boolean";
+          Validator::validateBoolean($value,  $msg);
+          $this->useWordSeperator = $value;
+          break;
         default:
           trigger_error(" unknown property ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "red"), E_USER_NOTICE) ;
           break;
@@ -246,7 +257,7 @@ use \Route;
         
         //validate argument
         $msg =  "Invalid argument type, ".Style::color(__CLASS__."->", "black").Style::color("display()", "black")." method argument must be a string";
-        Validator::validateString($displayBase, Message::write("error", $msg));
+        Validator::validateString($displayBase,  $msg);
         if(!file_exists($block)){
           trigger_error("The specified block file ".Style::color("'".$block."'", "black").", does not exist");
         }
@@ -255,7 +266,7 @@ use \Route;
             trigger_error("At least, a root '/' route must be defined, define using the ".Style::color(__CLASS__."->", "black").Style::color("routesMapDir", "black") . " propety. Example ".Style::color("routerObj->routesMapDir = ['/' => '/root']", "blue"));
           }else{
             //check if directory exist
-            if(!$this->checkDir($displayBase.$this->routes["/"], Message::write("error", "The root '/' route display base ".Style::color("'".$this->routes["/"]."'", "black")." specified, does not exist relative to the block display base ".Style::color($displayBase."/", "black"))));
+            if(!$this->checkDir($displayBase.$this->routes["/"],  "The root '/' route display base ".Style::color("'".$this->routes["/"]."'", "black")." specified, does not exist relative to the block display base ".Style::color($displayBase."/", "black")));
           }
         }
        
@@ -293,7 +304,6 @@ use \Route;
               //try and display the last segment as file. If fails, display default display file
               $file = $urlFragments[1];
               $routeBase = $displayBase.$this->routes[$parsedURL];
-     
               if(!$this->checkTargetFile($file, [], $routeBase, false)){
                 //try and display default file
                 $this->checkTargetFile($this->defaultBaseFile, [], $routeBase, false);
@@ -305,6 +315,7 @@ use \Route;
                 $routeBase = $displayBase.$this->routes[$subRoute];
                 $this->checkAndDisplay($urlFragments[1], [], $routeBase, false, false);
               }else{    
+                // dd($displayBase);
                 $this->checkForDynamicRoute($displayBase);
               }
             }
@@ -340,7 +351,7 @@ use \Route;
         ob_flush();
     }
 
-    public function error($url=null){
+    public function error(){
       if($this->displayFile == null){ //show 404 error
         $this->displayFile = ($this->error404File == null)? $this->displayFile = dirname(__DIR__, 1)."/files/404.php":$this->error404File;
         require($this->displayFile);
@@ -406,6 +417,7 @@ use \Route;
       $lastUrlSegment     = $this->unmaskExtenstion($trimUrl[$total-1]);
       $trimUrl[$total-1]  = $lastUrlSegment;
 
+
       //Set socket file for either system route or application route
 
       if($application != null){ //application socket files given
@@ -415,13 +427,14 @@ use \Route;
         $msg           = "The {$application->id} application socket file: ".Style::color($application->routeFiles->socket, "blue");// as argument 2 must be null or an array of socket files";
 
         Validator::validateFile($appSocketFile, $msg. " passed into does not exist");
+       
         $appSocketFiles = require_once($appSocketFile);
         $this->socketFiles = $appSocketFiles;
       }
       
       //Check for global file and plug
       if(isset($this->socketFiles[$name]["*"])){
-        $this->includeFile($this->socketFiles[$name]["*"], $application);
+        $this->includeFile($this->socketFiles[$name]["*"], $application);;
       } 
 
       if (count($this->socketFiles) > 0){
@@ -446,7 +459,8 @@ use \Route;
     }
     public function validateData($data){
       $msg =  " Invalid argument value, ".Style::color(__CLASS__."->", "black").Style::color("validateData(x)", "black")." method argument must be an array";
-      Validator::validateArray($data, Message::write("error", $msg));
+      Validator::validateArray($data,  $msg);
+      
       if(count($this->data) > 0){
         foreach ($this->data as $key => $value) {
           if(!in_array($value, $data)){
