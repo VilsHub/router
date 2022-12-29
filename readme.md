@@ -1,17 +1,10 @@
-# validator Overview
-validator is PHP library for validation of inputs received.
+# router Overview
+router is the routing system for zion light framework
 
 ## Requirements
 
-- It requires PHP version 5.x
+- It requires PHP version 7.3.x
 - vilshub/helpers library
 
 ## Installation
-It supports composer installation, with link **composer require vilshub/validator** 
-
-
-......... demo comming soon ..........
-
-
-
-Comprehensive documentation for this library will be provided soon, you may **Watch**, this repo for further updates.
+It supports composer installation, with link **composer require vilshub/router** 
