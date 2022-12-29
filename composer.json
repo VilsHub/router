@@ -1,7 +1,11 @@
 {
-    "name": "vilshub/router",
+    "name": "vilshub/validator",
+    "description": "Library for data validation used in zion light framework",
     "type": "library",
-    "description":"router is the routing system for zion light framework",
+    "require": {
+      "php":">=5.3.0",
+      "vilshub/helpers": "*"
+    },
     "license": "MIT",
     "authors": [
         {
@@ -10,13 +14,9 @@
         }
     ],
     "minimum-stability": "dev",
-    "require": {
-      "php":">=7.3.0",
-      "vilshub/helpers": "*"
-    },
     "autoload": {
         "psr-4": {
-            "vilshub\\router\\" : "src"
+            "vilshub\\validator\\" : "src"
         }
     }
 }
