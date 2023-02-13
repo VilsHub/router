@@ -18,12 +18,9 @@ use \Route;
     private $displayFile        = null;
     private $data               = null;
     private $defaultBaseFile    = "index";
-    private $defaultRouteMapDir = "/root";
     private $params             = [];
     private $routes             = null;
     private $dynamicRoute       = false;
-    private $strictDisplay      = false;
-    private $directories        = false;
     private $maintenanceURL     = null;
     private $maintenanceMode    = false;
     private $socketFiles        = [];
@@ -55,14 +52,18 @@ use \Route;
           }
         };
     }
-    private function checkDefaultBaseFile($baseDir){
-      $filePath = $baseDir."/".$this->defaultBaseFile.".php";
+    private function displayDefaultBaseFile($baseDir, $data=[]){
+      $parsedDefaultBaseFile = explode(".php", $this->defaultBaseFile);
+      $filePath = $baseDir."/".$parsedDefaultBaseFile[0].".php";
+      $status = false;
+      if (count($data) > 0) $this->data = $data;
+
       if(file_exists($filePath)){
         $this->setFile($filePath);
-        return true;
-      }else{
-        return false;
+        $status = true;
       }
+
+      return $status;
     }
     private function unmaskExtenstion($fileName){
       if ($this->useWordSeperator){
@@ -80,8 +81,8 @@ use \Route;
         }
       }
     }
-    private function checkTargetFile($fileName=null, $id=[], $displayBase, $useDefaultRouteMapDir=false){
-      $defaultRouteMapDir = $useDefaultRouteMapDir ? dirname($displayBase)."/".trim($this->defaultRouteMapDir, "/\\")."/":$displayBase;
+    private function checkTargetFile($fileName=null, $id=[], $displayBase){
+
       //unmask extension
       $fileName           = $this->unmaskExtenstion($fileName);
       $filePath           = $displayBase."/".$fileName.".php";
@@ -92,74 +93,54 @@ use \Route;
           $this->setData($id);
           return true;
         }
-      }else{
-        if(!$this->strictDisplay){
-          $this->setData($id);
-          return $this->checkDefaultBaseFile($defaultRouteMapDir);
-        }else{
-          return false;
-        }
       }
     }
-    private function checkAndDisplay($file, $data, $base, $useDefaultRouteMapDir, $includeDefault){ 
-      if(!$this->checkTargetFile($file, $data, $base, $useDefaultRouteMapDir)){
+    private function checkAndDisplay($file, $data, $base, $includeDefault){ 
+      if(!$this->checkTargetFile($file, $data, $base)){
         $this->setData($data);
-        if ($includeDefault === true) $this->checkDefaultBaseFile($base);
+        if ($includeDefault === true) $this->displayDefaultBaseFile($base);
       }
     }
-    private function pathIsValid($route, $uri){
-      $totalRouteSegments = count(Route::segments($route));
-      $totalURISegments = count(Route::segments($uri));
-      return $totalURISegments <= $totalRouteSegments+2;//2 is the last trail, which could either be data or file
-    }
-    private function validateTrail($routeSegments, $uriSegments){
-      $totalRouteSegments   = count($routeSegments);
-      $totalURISegments     = count($uriSegments);
-      $file                 = null;
-      $data                 = "";
-        
-      $strippedURISegments  = $uriSegments;
-      $trailSegments        = array_splice($strippedURISegments, $totalRouteSegments);
-      $trailUri             = implode("/", $trailSegments);
-      $totalTrailSegments   = count($trailSegments);
-      if($totalTrailSegments > 0){
-        if(isset($trailSegments[0]))$file = $trailSegments[0];
-        if(isset($trailSegments[1]))$data = $trailSegments[1]; 
-      }else{
-        $file = $uriSegments[$totalURISegments -1];
-      }
-   
-      return [
-        "file" => $file,
-        "data" => $data
-      ];
-    }
+
     private function checkForDynamicRoute($displayBase){
+
       if($this->dynamicRoute){
         foreach ($this->routes as $key => $value) {
-          $routeType = Route::type($key);
-          if($routeType == "static") continue;
-          if(!$this->pathIsValid($key, $this->url)) continue;
 
           $dynamicSegment = Route::dynamicInfo($key, $this->url);
           if($dynamicSegment["matched"] === TRUE){
-            //check for the last 2 trail and set file and data
-            $trailStatus = $this->validateTrail($dynamicSegment["routeSegments"], $dynamicSegment["urlSegments"]);
-            if(strlen($trailStatus["data"]) > 0) $dynamicSegment["data"][] = $trailStatus["data"];
-            $rootBase = $displayBase.$this->routes[$key];
-            $this->checkAndDisplay($trailStatus["file"],  $dynamicSegment["data"], $rootBase, false, false);
-            break;
+            //get display file
+            if($dynamicSegment["displayFile"] != null){ //use the defaultBaseFile as display file
+              $rootBase = $displayBase.$this->routes[$key];
+              $displayFile = ($dynamicSegment["displayFile"] == "default")?$this->defaultBaseFile:$dynamicSegment["displayFile"];
+              $this->checkAndDisplay($displayFile,  $dynamicSegment["data"], $rootBase, false, false);
+              break;
+            }
           }else{
             continue;
           }
         }
       }
+
     }
 
-    private function stripTrail($urlFragments){
-      $total = count($urlFragments);
-      unset($urlFragments[$total-1]);
-      return "/".implode("/", $urlFragments);
+    private function isDynamicRoute($route){
+      if($this->dynamicRoute){
+          $routeType = Route::type($route);
+          if($routeType == "static"){
+            return false;
+          }else{
+            return true;
+          };
+
+      }else{
+        return false;
+      }
+    }
+
+    private function matchForDynamicRoute($route){
+      $dynamicSegment = Route::dynamicInfo($route, $this->url);
+      return $dynamicSegment["matched"] === TRUE;
     }
 
     private function redirect($url){
@@ -187,11 +168,6 @@ use \Route;
           $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a string of file name e.g ".Style::color("index.php", "blue");
           Validator::validateString($value,  $msg);
           $this->defaultBaseFile = rtrim($value, ".php");
-          break;
-        case 'defaultRouteMapDir':
-          $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a string";
-          Validator::validateString($value,  $msg);
-          $this->defaultRouteMapDir = $value;
           break;
         case 'dynamicRoute':
           $msg =  " Invalid property value, ".Style::color(__CLASS__."->", "black").Style::color($propertyName, "black")." value must be a boolean";
@@ -233,9 +209,6 @@ use \Route;
         case 'params':
           return $this->params;
           break;
-        case 'directories':
-          return $this->directories;
-          break;
         case 'showContent':
           global $app;
           extract(["router" => $app]);
@@ -244,8 +217,9 @@ use \Route;
       }
     }
 
-    public function listen($block, $displayBase, $routes=null, $strict=false){
+    public function listen($block, $displayBase, $routes=null){
         $url = $_SERVER["REQUEST_URI"];
+        
         if ($this->maintenanceMode) {
           if($url != $this->maintenanceURL){
             $this->redirect($this->maintenanceURL);
@@ -253,14 +227,15 @@ use \Route;
         };
         $this->routes = $routes == null ? $this->routes:$routes;
         ob_start();
-        $this->strictDisplay = $strict;
-        
+
         //validate argument
-        $msg =  "Invalid argument type, ".Style::color(__CLASS__."->", "black").Style::color("display()", "black")." method argument must be a string";
+        $msg =  "Invalid argument type, ".Style::color(__CLASS__."->", "black").Style::color("listen(.x..)", "black")." method argument 2 must be a string";
         Validator::validateString($displayBase,  $msg);
+
         if(!file_exists($block)){
           trigger_error("The specified block file ".Style::color("'".$block."'", "black").", does not exist");
         }
+
         if($routes == null){
           if(!isset($this->routes["/"])){
             trigger_error("At least, a root '/' route must be defined, define using the ".Style::color(__CLASS__."->", "black").Style::color("routesMapDir", "black") . " propety. Example ".Style::color("routerObj->routesMapDir = ['/' => '/root']", "blue"));
@@ -269,74 +244,77 @@ use \Route;
             if(!$this->checkDir($displayBase.$this->routes["/"],  "The root '/' route display base ".Style::color("'".$this->routes["/"]."'", "black")." specified, does not exist relative to the block display base ".Style::color($displayBase."/", "black")));
           }
         }
-       
         
         if($url == "/"){//root        
           //check for default base file
           $rootBase = $displayBase.$this->routes["/"];
-          if(!$this->checkDefaultBaseFile($rootBase)){
-            trigger_error($msg);
-          }
+         
+          if(!$this->displayDefaultBaseFile($rootBase)) trigger_error("No defaultDisplayFile (".Style::color($this->defaultBaseFile.".php", "black"). ") found for the '/' block home page for)");
+
         }else{
           $trimUrl          = trim($url, "/");
           $parsedURL        = rtrim($url, "/");
 
           $urlFragments     = explode("/", $trimUrl);
           $urlTotalSegments = count($urlFragments);
-          $subRoute         = $this->stripTrail($urlFragments);
-          if($urlTotalSegments == 1){
-            if(isset($this->routes[$parsedURL])){//has a defined route
-              //try and display default file 
-              $routeBase = $displayBase.$this->routes[$parsedURL];
-              $this->checkTargetFile($trimUrl, [], $routeBase, false);
-            }else{
-              //check if display file exist for it
-              if($routes == null){
-                $rootBase = $displayBase.$this->routes["/"];
-                if(!$this->checkTargetFile($urlFragments[0], [], $rootBase)){
-                  //file not exist, check for dynamic segment
-                  $this->checkForDynamicRoute($displayBase);
-                }
-              }
-            }
-          }else if($urlTotalSegments == 2){
-            if(isset($this->routes[$parsedURL])){//has a defined route
-              //try and display the last segment as file. If fails, display default display file
-              $file = $urlFragments[1];
-              $routeBase = $displayBase.$this->routes[$parsedURL];
-              if(!$this->checkTargetFile($file, [], $routeBase, false)){
-                //try and display default file
-                $this->checkTargetFile($this->defaultBaseFile, [], $routeBase, false);
-              }
-            }else{
-              //check sub route
-              if(isset($this->routes[$subRoute])){
-                //include 2nd segment as file, and pass no data
-                $routeBase = $displayBase.$this->routes[$subRoute];
-                $this->checkAndDisplay($urlFragments[1], [], $routeBase, false, false);
-              }else{    
-                // dd($displayBase);
-                $this->checkForDynamicRoute($displayBase);
-              }
-            }
 
-          }else if($urlTotalSegments > 2){
-            if(isset($this->routes[$parsedURL])){//has a defined route
-              //try and display the last segment as file. If fails, display default display file
-              $file = $urlFragments[$urlTotalSegments-1];
-              $routeBase = $displayBase.$this->routes[$parsedURL];
-              if(!$this->checkTargetFile($file, [], $routeBase, false)){
-                //try and display default file
-                $this->checkTargetFile($this->defaultBaseFile, [], $routeBase, false);
-              }
-            }else{   
-              //check sub route
-              if(isset($this->routes[$subRoute])){
-                //include last segment as file, and pass no data
-                $routeBase = $displayBase.$this->routes[$subRoute];
-                $this->checkAndDisplay($urlFragments[$urlTotalSegments-1], [], $routeBase, false, false);
-              }else{
-                $this->checkForDynamicRoute($displayBase);
+          if(isset($this->routes[$parsedURL])){//has a defined route
+             //try and display default file 
+
+             $routeBase = $displayBase.$this->routes[$parsedURL];
+             $this->displayDefaultBaseFile($routeBase, []);
+
+          }else{
+            if ($urlTotalSegments == 1){ // Check against the / route for display file
+              $rootBase = $displayBase.$this->routes["/"];           
+              $this->checkTargetFile($urlFragments[0], [], $rootBase);
+            }else{
+              foreach ($this->routes as $routeDefinition => $routeDisplayBase) {
+              
+                $parsedRoute          = trim($routeDefinition, "/");
+                $routeSegments        = explode("/", $parsedRoute);
+                  
+                if ($urlTotalSegments == 1){
+                  // if route difinition is not dynamic skip
+                  if ($this->isDynamicRoute($routeSegments[0])){
+                    //try matching th regular expression
+                    if ($this->matchForDynamicRoute($routeSegments[0])){
+                      $parsedRouteSegment = rtrim($routeSegments[0], ":");
+                      $routeBase = $displayBase.$this->routes["/".$parsedRouteSegment];
+                      
+                      //check and display default file, if true pass dynamic segment as data
+                      $this->displayDefaultBaseFile($routeBase, [$urlFragments[0]]);
+                    }else{
+                      continue;
+                    }
+                  }else{
+                    continue;
+                  }
+                }else if($urlTotalSegments > 1){
+                
+                    if ($this->isDynamicRoute($parsedRoute)){
+
+                      // check if against all route trails
+                      $this->checkForDynamicRoute($displayBase);
+ 
+                    }else{
+                      //one or both segments may be dynamic
+                      //extract the last segment from url, and check if the route is defined without the last trail in url
+                      $lastURLSegment = $urlFragments[$urlTotalSegments-1];
+                      $temp = $urlFragments;
+                      unset($temp[$urlTotalSegments-1]);
+                      $extractedURL = implode("/", $temp);
+
+                      if(isset($this->routes["/".$extractedURL])){//has a defined route
+                        //check if last trail exist as file, then display it, else 404 as route is not dynamic
+                        $routeBase = $displayBase.$this->routes["/".$extractedURL];
+                        $this->checkTargetFile($lastURLSegment, [], $routeBase);
+                      }
+                      
+                    }
+
+                }
+                
               }
             }
           }
@@ -365,7 +343,7 @@ use \Route;
             require($this->error404File);
             die;
           }else{
-            trigger_error("No {$type} error file found");
+            trigger_error("No ".Style::color($type, "black")." error file found");
           }
           break;
         default:
@@ -451,12 +429,6 @@ use \Route;
       }      
     }
 
-    public function validateURLSegments($maxSegment){//if url segment is more than the specified max
-      $urlSegments = Route::segments($this->url);
-      if($urlSegments > $maxSegment){
-        $this->error($this->error404URL);
-      }
-    }
     public function validateData($data){
       $msg =  " Invalid argument value, ".Style::color(__CLASS__."->", "black").Style::color("validateData(x)", "black")." method argument must be an array";
       Validator::validateArray($data,  $msg);
