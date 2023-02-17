@@ -81,7 +81,7 @@ use \Route;
         }
       }
     }
-    private function checkTargetFile($fileName=null, $id=[], $displayBase){
+    private function checkTargetFile($displayBase, $fileName=null, $id=[]){
 
       //unmask extension
       $fileName           = $this->unmaskExtenstion($fileName);
@@ -96,7 +96,7 @@ use \Route;
       }
     }
     private function checkAndDisplay($file, $data, $base, $includeDefault){ 
-      if(!$this->checkTargetFile($file, $data, $base)){
+      if(!$this->checkTargetFile($base, $file, $data)){
         $this->setData($data);
         if ($includeDefault === true) $this->displayDefaultBaseFile($base);
       }
@@ -267,7 +267,7 @@ use \Route;
           }else{
             if ($urlTotalSegments == 1){ // Check against the / route for display file
               $rootBase = $displayBase.$this->routes["/"];           
-              $this->checkTargetFile($urlFragments[0], [], $rootBase);
+              $this->checkTargetFile($rootBase, $urlFragments[0], []);
             }else{
               foreach ($this->routes as $routeDefinition => $routeDisplayBase) {
               
@@ -308,7 +308,7 @@ use \Route;
                       if(isset($this->routes["/".$extractedURL])){//has a defined route
                         //check if last trail exist as file, then display it, else 404 as route is not dynamic
                         $routeBase = $displayBase.$this->routes["/".$extractedURL];
-                        $this->checkTargetFile($lastURLSegment, [], $routeBase);
+                        $this->checkTargetFile($routeBase, $lastURLSegment, []);
                       }
                       
                     }
