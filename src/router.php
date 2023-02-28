@@ -81,6 +81,22 @@ use \Route;
         }
       }
     }
+    private function displayFileExist($displayBase, $fileName){
+      $status = [
+        "exist"    =>  false,
+        "fileName"  =>  null 
+      ];
+
+      //unmask extension
+      $fileName  = $this->useWordSeperator? $this->unmaskExtenstion($fileName) : $fileName;
+      $filePath  = $displayBase."/".$fileName.".php";
+
+      $status["exist"]    = (bool) file_exists($filePath);
+      $status["fileName"] = $fileName;
+      $status["filePath"] = $filePath;
+
+      return $status;
+    }
     private function checkTargetFile($displayBase, $fileName=null, $id=[]){
 
       //unmask extension
@@ -259,14 +275,22 @@ use \Route;
           $urlTotalSegments = count($urlFragments);
 
           if(isset($this->routes[$parsedURL])){//has a defined route
-             //try and display default file 
 
-             $routeBase = $displayBase.$this->routes[$parsedURL];
-             $this->displayDefaultBaseFile($routeBase, []);
+            $routeBase = $displayBase.$this->routes[$parsedURL];
+            //check if trail exist as file
+            $fileInfo = $this->displayFileExist($routeBase, $trimUrl);
+
+            if ($fileInfo["exist"]){
+              $this->setFile($fileInfo["filePath"]);
+            }else{
+              //try and display default file 
+              $this->displayDefaultBaseFile($routeBase, []);
+            }
 
           }else{
+
             if ($urlTotalSegments == 1){ // Check against the / route for display file
-              $rootBase = $displayBase.$this->routes["/"];           
+              $rootBase = $displayBase.$this->routes["/"];   
               $this->checkTargetFile($rootBase, $urlFragments[0], []);
             }else{
               foreach ($this->routes as $routeDefinition => $routeDisplayBase) {
