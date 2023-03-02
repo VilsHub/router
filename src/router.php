@@ -7,7 +7,7 @@ use vilshub\helpers\Style;
 use vilshub\validator\Validator;
 use \Route;
 
-/**
+/**f
  * 
  */
   class Router
@@ -16,7 +16,7 @@ use \Route;
     private $error404File       = null;
     private $error404URL        = null;
     private $displayFile        = null;
-    private $data               = null;
+    private $data               = [];
     private $defaultBaseFile    = "index";
     private $params             = [];
     private $routes             = null;
@@ -65,8 +65,8 @@ use \Route;
 
       return $status;
     }
-    private function unmaskExtenstion($fileName){
-      if ($this->useWordSeperator){
+    private function unmaskExtenstion($fileName, $joinSeparatedWords=true){
+      if ($this->useWordSeperator && $joinSeparatedWords){
         $fileName = str_replace($this->wordSeperator, "", $fileName);
       }
       return str_replace($this->maskExtension, "", $fileName);
@@ -390,10 +390,11 @@ use \Route;
           $status = false;
         }
       }else if($totalKeysSegments == 1){
+
         $index = array_search($keysSegments[0], $trimUrl, true);
         if($index !== false){//segment exist 
           $status = true;
-        }else{
+        }else{       
           $status = false;
         }
       }
@@ -416,7 +417,7 @@ use \Route;
       $total    = count($trimUrl);
 
       //unmask last url segment
-      $lastUrlSegment     = $this->unmaskExtenstion($trimUrl[$total-1]);
+      $lastUrlSegment     = $this->unmaskExtenstion($trimUrl[$total-1], false);
       $trimUrl[$total-1]  = $lastUrlSegment;
 
 
